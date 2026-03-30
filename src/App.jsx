@@ -785,7 +785,7 @@ const S = {
 
   dayStrip: { display: "flex", gap: 6, marginBottom: 20, overflowX: "auto" },
   dayChip: { minWidth: 38, height: 38, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 1, background: "none", color: MUTED, fontSize: 13, cursor: "pointer", flexShrink: 0, transition: "all .15s", fontFamily: "sans-serif" },
-  dayChipOn: { background: SURF, color: "#fff", borderColor: "rgba(255,255,255,0.25)" },
+  dayChipOn: { background: "rgba(201,169,122,0.15)", color: GOLD, borderColor: GOLD },
 
   uploadBox: { width: "100%", height: 200, borderRadius: 2, overflow: "hidden", marginBottom: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" },
   emptyMsg: { textAlign: "center", color: MUTED, fontSize: 12, padding: "32px 0", letterSpacing: "0.05em", fontFamily: "sans-serif" },

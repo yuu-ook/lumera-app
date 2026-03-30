@@ -1,5 +1,6 @@
 {
   "name": "lumera-app",
+  "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -9,9 +10,7 @@
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
-  },
-  "devDependencies": {
+    "react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.0.0",
     "vite": "^4.4.0"
   }

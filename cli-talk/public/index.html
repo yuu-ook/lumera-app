@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#1f2a44">
+<title>CLI Talk</title>
+<style>
+:root {
+  --bg: #f4f5f8; --panel: #ffffff; --line: #e3e6ec; --text: #1c2333; --sub: #7a8396;
+  --head: #1f2a44; --head-text: #ffffff; --accent: #3d6df2; --accent-text: #ffffff;
+  --chat-bg: #dfe6f1; --bot: #ffffff; --me: #3d6df2; --me-text: #ffffff;
+  --chip: rgba(31,42,68,.08); --code: #f0f2f7; --danger: #d6455d; --badge: #e5484d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151c; --panel: #191d27; --line: #2a303d; --text: #e8ebf2; --sub: #8c95a8;
+    --head: #151a26; --chat-bg: #10131a; --bot: #232937; --me: #3d6df2;
+    --chip: rgba(255,255,255,.08); --code: #12151c;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+input, select, textarea { font: inherit; color: inherit; }
+.app { display: flex; height: 100dvh; }
+
+/* ── トーク一覧 ── */
+.side { width: 340px; flex: none; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+.side-head { background: var(--head); color: var(--head-text); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; display: flex; align-items: center; gap: 10px; }
+.side-head h1 { font-size: 18px; margin: 0; flex: 1; letter-spacing: .02em; }
+.conn { width: 8px; height: 8px; border-radius: 50%; background: #f5a623; }
+.conn.on { background: #3ecf8e; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 20px; }
+.icon-btn:hover { background: rgba(127,127,127,.18); }
+.rooms { flex: 1; overflow-y: auto; }
+.room { display: flex; gap: 12px; padding: 12px 16px; width: 100%; text-align: left; align-items: center; }
+.room:hover { background: var(--chip); }
+.room.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.avatar { width: 46px; height: 46px; border-radius: 16px; flex: none; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff; background: #6b5cf0; font-family: ui-monospace, Menlo, monospace; }
+.avatar.shell { background: #2b3348; color: #7ee0a8; }
+.avatar.sm { width: 32px; height: 32px; border-radius: 11px; font-size: 11px; }
+.room-main { flex: 1; min-width: 0; }
+.room-top { display: flex; align-items: baseline; gap: 8px; }
+.room-name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-time { font-size: 11px; color: var(--sub); flex: none; }
+.room-bottom { display: flex; gap: 8px; align-items: center; }
+.room-prev { flex: 1; color: var(--sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { background: var(--badge); color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; padding: 0 6px; }
+.empty { padding: 40px 24px; text-align: center; color: var(--sub); }
+.primary { background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 10px 18px; font-weight: 600; }
+.primary:disabled { opacity: .5; }
+
+/* ── チャット ── */
+.chat { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--chat-bg); }
+.chat-head { background: var(--head); color: var(--head-text); padding: calc(10px + env(safe-area-inset-top)) 12px 10px; display: flex; align-items: center; gap: 10px; }
+.back { display: none; }
+.chat-title { flex: 1; min-width: 0; }
+.chat-title b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-title span { display: block; font-size: 11px; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.msgs { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 6px; overscroll-behavior: contain; }
+.day { align-self: center; font-size: 11px; background: var(--chip); color: var(--sub); border-radius: 10px; padding: 2px 10px; margin: 8px 0 4px; }
+.row { display: flex; gap: 8px; align-items: flex-end; max-width: 100%; }
+.row.me { flex-direction: row-reverse; }
+.row .avatar { align-self: flex-start; }
+.bubble { background: var(--bot); border-radius: 4px 18px 18px 18px; padding: 8px 12px; max-width: min(78%, 720px); overflow-wrap: anywhere; min-width: 0; box-shadow: 0 1px 1px rgba(0,0,0,.05); }
+.row.me .bubble { background: var(--me); color: var(--me-text); border-radius: 18px 4px 18px 18px; white-space: pre-wrap; }
+.bubble.mono { font: 12.5px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; background: #1b2030; color: #dfe5f2; max-width: min(88%, 900px); overflow-x: auto; }
+.bubble p { margin: 0 0 .5em; } .bubble p:last-child { margin-bottom: 0; }
+.bubble ul, .bubble ol { margin: .2em 0 .5em; padding-left: 1.4em; }
+.bubble h3 { font-size: 1em; margin: .6em 0 .3em; } .bubble h3:first-child { margin-top: 0; }
+.bubble code { font: 12.5px ui-monospace, Menlo, Consolas, monospace; background: var(--code); border-radius: 4px; padding: 1px 4px; }
+.bubble pre { background: #1b2030; color: #dfe5f2; border-radius: 8px; padding: 10px; overflow-x: auto; margin: .4em 0; }
+.bubble pre code { background: none; padding: 0; color: inherit; }
+.bubble a { color: var(--accent); }
+.bubble table { border-collapse: collapse; margin: .4em 0; font-size: 13px; display: block; overflow-x: auto; }
+.bubble th, .bubble td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; }
+.meta { font-size: 10.5px; color: var(--sub); flex: none; text-align: right; line-height: 1.3; padding-bottom: 2px; }
+.tool { align-self: flex-start; margin-left: 40px; font-size: 12px; color: var(--sub); background: var(--chip); border-radius: 12px; padding: 3px 10px; max-width: calc(100% - 52px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool b { color: var(--text); font-weight: 600; margin-right: 6px; }
+.sys { align-self: center; font-size: 12px; color: var(--sub); background: var(--chip); border-radius: 12px; padding: 4px 12px; max-width: 90%; white-space: pre-wrap; text-align: center; overflow-wrap: anywhere; }
+.typing { display: inline-flex; gap: 4px; padding: 4px 2px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--sub); animation: blink 1.2s infinite; }
+.typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .typing i { animation: none; } }
+.exit { font-size: 10.5px; color: var(--danger); }
+.composer { background: var(--panel); border-top: 1px solid var(--line); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); display: flex; gap: 8px; align-items: flex-end; }
+.composer textarea { flex: 1; resize: none; border: 1px solid var(--line); background: var(--bg); border-radius: 18px; padding: 8px 14px; max-height: 160px; outline: none; font-size: 16px; line-height: 1.4; }
+.composer textarea:focus { border-color: var(--accent); }
+.send, .stop { width: 40px; height: 40px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font-size: 18px; }
+.send { background: var(--accent); } .send:disabled { opacity: .4; }
+.stop { background: var(--danger); font-size: 13px; }
+.placeholder { flex: 1; display: grid; place-items: center; color: var(--sub); text-align: center; padding: 24px; }
+
+/* ── モーダル ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.modal { background: var(--panel); border-radius: 16px; padding: 20px; width: min(440px, 100%); max-height: 90dvh; overflow-y: auto; }
+.modal h2 { margin: 0 0 14px; font-size: 17px; }
+.field { display: block; margin-bottom: 12px; }
+.field > span { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+.field input, .field select { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 12px; font-size: 16px; outline: none; }
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field small { display: block; color: var(--sub); font-size: 11.5px; margin-top: 4px; }
+.seg { display: flex; gap: 8px; }
+.seg label { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; }
+.seg label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); }
+.seg b { display: block; } .seg small { color: var(--sub); font-size: 11.5px; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+.ghost { padding: 10px 14px; border-radius: 10px; }
+.ghost:hover { background: var(--chip); }
+.ghost.danger { color: var(--danger); margin-right: auto; }
+.err { color: var(--danger); font-size: 13px; min-height: 1.2em; }
+[hidden] { display: none !important; }
+
+@media (max-width: 720px) {
+  .side { width: 100%; border: 0; }
+  .chat { display: none; }
+  .app.open .side { display: none; }
+  .app.open .chat { display: flex; }
+  .back { display: grid; }
+  .bubble { max-width: 84%; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="side">
+    <div class="side-head">
+      <h1>トーク</h1>
+      <span class="conn" id="conn" title="接続状態"></span>
+      <button class="icon-btn" id="newBtn" title="新しいトーク" aria-label="新しいトーク">＋</button>
+    </div>
+    <div class="rooms" id="rooms"></div>
+  </aside>
+  <main class="chat" id="chat">
+    <div class="placeholder" id="placeholder"><div>左の一覧からトークを選ぶか、<br>「＋」で CLI とのトークを作成してください。</div></div>
+    <div class="chat-head" id="chatHead" hidden>
+      <button class="icon-btn back" id="backBtn" aria-label="戻る">‹</button>
+      <div class="chat-title"><b id="chatName"></b><span id="chatSub"></span></div>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="トークの設定">⋯</button>
+    </div>
+    <div class="msgs" id="msgs" hidden></div>
+    <form class="composer" id="composer" hidden>
+      <textarea id="input" rows="1" placeholder="メッセージを入力" enterkeyhint="send"></textarea>
+      <button type="button" class="stop" id="stopBtn" hidden title="停止" aria-label="停止">■</button>
+      <button type="submit" class="send" id="sendBtn" disabled title="送信" aria-label="送信">➤</button>
+    </form>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <form class="modal" id="roomForm">
+    <h2 id="formTitle">新しいトーク</h2>
+    <div class="field" id="typeField">
+      <span>接続する CLI</span>
+      <div class="seg">
+        <label><input type="radio" name="type" value="claude" checked><b>Claude Code</b><small>日本語で指示。会話は継続されます</small></label>
+        <label><input type="radio" name="type" value="shell"><b>シェル</b><small>コマンドをそのまま実行</small></label>
+      </div>
+    </div>
+    <label class="field"><span>トーク名</span><input name="name" maxlength="60" placeholder="例: Lumera 開発"></label>
+    <label class="field"><span>作業フォルダ</span><input name="cwd" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <small>CLI はこのフォルダで動きます</small></label>
+    <label class="field" id="modeField"><span>権限モード</span>
+      <select name="mode">
+        <option value="acceptEdits">ファイル編集を自動許可（おすすめ）</option>
+        <option value="plan">プランのみ（変更しない）</option>
+        <option value="auto">自動判定</option>
+        <option value="dontAsk">許可済みの操作だけ実行</option>
+        <option value="bypassPermissions">すべて許可（確認なし・注意）</option>
+      </select>
+      <small>チャットからは都度の許可確認に答えられないため、あらかじめ決めておきます</small></label>
+    <div class="err" id="formErr"></div>
+    <div class="actions">
+      <button type="button" class="ghost danger" id="deleteBtn" hidden>削除</button>
+      <button type="button" class="ghost" id="resetBtn" hidden>会話をリセット</button>
+      <button type="button" class="ghost" id="cancelBtn">キャンセル</button>
+      <button type="submit" class="primary" id="saveBtn">作成</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const rooms = new Map();
+let activeId = null, defaultCwd = '', editingId = null;
+const lastSeen = JSON.parse(localStorage.getItem('clitalk_seen') || '{}');
+const saveSeen = () => { try { localStorage.setItem('clitalk_seen', JSON.stringify(lastSeen)); } catch {} };
+
+async function api(method, url, body) {
+  const res = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// ── 表示用ユーティリティ ──
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const hhmm = (ts) => new Date(ts).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+const dayKey = (ts) => new Date(ts).toDateString();
+function dayLabel(ts) {
+  const d = new Date(ts), now = new Date();
+  if (d.toDateString() === now.toDateString()) return '今日';
+  if (d.toDateString() === new Date(now - 864e5).toDateString()) return '昨日';
+  return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+}
+const listTime = (ts) => (dayKey(ts) === dayKey(Date.now()) ? hhmm(ts) : dayLabel(ts));
+
+function inline(s) {
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
+  s = esc(s)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(^|[\s(（「])(https?:\/\/[^\s<)）」]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>');
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[i])}</code>`);
+}
+function markdown(src) {
+  const out = [];
+  const lines = src.split('\n');
+  let i = 0, para = [];
+  const flush = () => { if (para.length) { out.push(`<p>${para.map(inline).join('<br>')}</p>`); para = []; } };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^\s*```/.test(line)) {
+      flush();
+      const body = [];
+      i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) body.push(lines[i++]);
+      i++;
+      out.push(`<pre><code>${esc(body.join('\n'))}</code></pre>`);
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) { flush(); out.push(`<h3>${inline(h[2])}</h3>`); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1] || '')) {
+      flush();
+      const cells = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => inline(c.trim()));
+      let html = `<table><tr>${cells(line).map((c) => `<th>${c}</th>`).join('')}</tr>`;
+      i += 2;
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) html += `<tr>${cells(lines[i++]).map((c) => `<td>${c}</td>`).join('')}</tr>`;
+      out.push(html + '</table>');
+      continue;
+    }
+    const li = /^\s*([-*•]|\d+[.)])\s+(.*)$/.exec(line);
+    if (li) {
+      flush();
+      const tag = /\d/.test(li[1]) ? 'ol' : 'ul';
+      const items = [];
+      while (i < lines.length) {
+        const m = /^\s*([-*•]|\d+[.)])\s+(.*)$/.exec(lines[i]);
+        if (!m) break;
+        items.push(`<li>${inline(m[2])}</li>`);
+        i++;
+      }
+      out.push(`<${tag}>${items.join('')}</${tag}>`);
+      continue;
+    }
+    if (!line.trim()) { flush(); i++; continue; }
+    para.push(line);
+    i++;
+  }
+  flush();
+  return out.join('');
+}
+
+// ── トーク一覧 ──
+const avatarHtml = (room, sm) => `<div class="avatar ${room.type === 'shell' ? 'shell' : ''} ${sm ? 'sm' : ''}">${room.type === 'shell' ? '&gt;_' : 'AI'}</div>`;
+function preview(room) {
+  if (room.busy) return room.type === 'shell' ? '実行中…' : '入力中…';
+  for (let i = room.messages.length - 1; i >= 0; i--) {
+    const m = room.messages[i];
+    if (m.role === 'tool') continue;
+    return (m.role === 'me' ? 'あなた: ' : '') + m.text.replace(/\s+/g, ' ').slice(0, 80);
+  }
+  return 'メッセージはまだありません';
+}
+const unread = (room) => room.messages.filter((m) => (m.role === 'bot' || m.role === 'system') && m.ts > (lastSeen[room.id] || 0)).length;
+
+function renderRooms() {
+  const list = [...rooms.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const el = $('rooms');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><p>まだトークがありません。<br>CLI とつないで指示を出してみましょう。</p><button class="primary" id="firstBtn">トークを作成</button></div>';
+    $('firstBtn').onclick = () => openForm();
+    return;
+  }
+  el.innerHTML = list.map((r) => {
+    const n = r.id === activeId ? 0 : unread(r);
+    return `<button class="room ${r.id === activeId ? 'active' : ''}" data-id="${r.id}">
+      ${avatarHtml(r)}
+      <div class="room-main">
+        <div class="room-top"><span class="room-name">${esc(r.name)}</span><span class="room-time">${r.updatedAt ? listTime(r.updatedAt) : ''}</span></div>
+        <div class="room-bottom"><span class="room-prev">${esc(preview(r))}</span>${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</div>
+      </div></button>`;
+  }).join('');
+}
+$('rooms').addEventListener('click', (e) => {
+  const b = e.target.closest('.room');
+  if (b) openRoom(b.dataset.id);
+});
+
+// ── チャット ──
+const msgEls = new Map();
+const nearBottom = () => { const el = $('msgs'); return el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
+const toBottom = () => { const el = $('msgs'); el.scrollTop = el.scrollHeight; };
+
+function setBody(el, m) {
+  if (m.role === 'bot' && !m.mono) {
+    el.innerHTML = m.text ? markdown(m.text) : '<span class="typing"><i></i><i></i><i></i></span>';
+  } else {
+    el.textContent = m.text;
+  }
+}
+function metaHtml(m) {
+  if (m.role === 'me') return `${m.read ? '既読<br>' : ''}${hhmm(m.ts)}`;
+  const exit = m.exit !== undefined && m.exit !== 0 ? `<span class="exit">終了 ${esc(String(m.exit))}</span><br>` : '';
+  return exit + hhmm(m.ts);
+}
+function buildMsg(room, m) {
+  let el;
+  if (m.role === 'tool') {
+    el = document.createElement('div');
+    el.className = 'tool';
+    el.innerHTML = `<b>${esc(m.tool || 'tool')}</b>${esc(m.text || '')}`;
+    el.title = m.text || '';
+  } else if (m.role === 'system') {
+    el = document.createElement('div');
+    el.className = 'sys';
+    el.textContent = m.text;
+  } else {
+    el = document.createElement('div');
+    el.className = `row ${m.role === 'me' ? 'me' : ''}`;
+    el.innerHTML = `${m.role === 'me' ? '' : avatarHtml(room, true)}<div class="bubble ${m.mono ? 'mono' : ''}"></div><div class="meta">${metaHtml(m)}</div>`;
+    setBody(el.querySelector('.bubble'), m);
+  }
+  return el;
+}
+function appendMsg(room, m, prev) {
+  const box = $('msgs');
+  if (!prev || dayKey(prev.ts) !== dayKey(m.ts)) {
+    const d = document.createElement('div');
+    d.className = 'day';
+    d.textContent = dayLabel(m.ts);
+    box.appendChild(d);
+  }
+  const el = buildMsg(room, m);
+  msgEls.set(m.id, el);
+  box.appendChild(el);
+}
+function renderTyping() {
+  document.getElementById('typingRow')?.remove();
+  const room = rooms.get(activeId);
+  if (!room || !room.busy) return;
+  const last = room.messages[room.messages.length - 1];
+  if (last && last.streaming) return; // 吹き出し自体が出ている
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.id = 'typingRow';
+  el.innerHTML = `${avatarHtml(room, true)}<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>`;
+  $('msgs').appendChild(el);
+}
+function renderChat() {
+  const room = rooms.get(activeId);
+  const has = !!room;
+  $('placeholder').hidden = has;
+  for (const id of ['chatHead', 'msgs', 'composer']) $(id).hidden = !has;
+  $('app').classList.toggle('open', has);
+  if (!has) return;
+  renderHead();
+  const box = $('msgs');
+  box.innerHTML = '';
+  msgEls.clear();
+  room.messages.forEach((m, i) => appendMsg(room, m, room.messages[i - 1]));
+  renderTyping();
+  toBottom();
+}
+function renderHead() {
+  const room = rooms.get(activeId);
+  if (!room) return;
+  $('chatName').textContent = room.name;
+  $('chatSub').textContent = '‎' + room.cwd;
+  $('stopBtn').hidden = !room.busy;
+  $('input').placeholder = room.type === 'shell' ? 'コマンドを入力（例: ls -la）' : 'メッセージを入力';
+}
+function markSeen() {
+  if (!activeId || document.hidden) return;
+  lastSeen[activeId] = Date.now();
+  saveSeen();
+}
+function openRoom(id) {
+  activeId = id;
+  markSeen();
+  renderRooms();
+  renderChat();
+  if (matchMedia('(min-width: 721px)').matches) $('input').focus();
+}
+$('backBtn').onclick = () => { activeId = null; renderRooms(); renderChat(); };
+document.addEventListener('visibilitychange', () => { markSeen(); renderRooms(); });
+
+// ── 送信 ──
+const input = $('input');
+function autosize() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+  $('sendBtn').disabled = !input.value.trim();
+}
+input.addEventListener('input', autosize);
+input.addEventListener('keydown', (e) => {
+  // 日本語変換の確定 Enter では送信しない。スマホでは Enter は改行
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+  if (matchMedia('(pointer: coarse)').matches) return;
+  e.preventDefault();
+  $('composer').requestSubmit();
+});
+$('composer').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || !activeId) return;
+  input.value = '';
+  autosize();
+  try { await api('POST', `/api/rooms/${activeId}/send`, { text }); }
+  catch (err) { input.value = text; autosize(); alert('送信できませんでした: ' + err.message); }
+});
+$('stopBtn').onclick = () => activeId && api('POST', `/api/rooms/${activeId}/stop`).catch(() => {});
+
+// ── トークの作成・設定 ──
+const form = $('roomForm');
+function openForm(room) {
+  editingId = room ? room.id : null;
+  $('formTitle').textContent = room ? 'トークの設定' : '新しいトーク';
+  $('saveBtn').textContent = room ? '保存' : '作成';
+  $('typeField').hidden = !!room;
+  $('deleteBtn').hidden = !room;
+  $('resetBtn').hidden = !room || room.type !== 'claude';
+  form.name.value = room ? room.name : '';
+  form.cwd.value = room ? room.cwd : defaultCwd;
+  form.mode.value = room ? room.mode || 'acceptEdits' : 'acceptEdits';
+  if (!room) form.type.value = 'claude';
+  $('modeField').hidden = (room ? room.type : form.type.value) === 'shell';
+  $('formErr').textContent = '';
+  $('overlay').hidden = false;
+  form.name.focus();
+}
+const closeForm = () => { $('overlay').hidden = true; };
+form.addEventListener('change', (e) => { if (e.target.name === 'type') $('modeField').hidden = form.type.value === 'shell'; });
+$('newBtn').onclick = () => openForm();
+$('settingsBtn').onclick = () => openForm(rooms.get(activeId));
+$('cancelBtn').onclick = closeForm;
+$('overlay').addEventListener('mousedown', (e) => { if (e.target === $('overlay')) closeForm(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeForm(); });
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const type = form.type.value;
+  const body = { name: form.name.value.trim() || (type === 'shell' ? 'シェル' : 'Claude Code'), cwd: form.cwd.value, mode: form.mode.value };
+  try {
+    if (editingId) await api('PATCH', `/api/rooms/${editingId}`, body);
+    else {
+      const room = await api('POST', '/api/rooms', { ...body, type });
+      upsertRoom(room);
+      openRoom(room.id);
+    }
+    closeForm();
+  } catch (err) { $('formErr').textContent = err.message; }
+});
+$('deleteBtn').onclick = async () => {
+  if (!confirm('このトークを削除しますか？履歴も消えます。')) return;
+  await api('DELETE', `/api/rooms/${editingId}`).catch((e) => alert(e.message));
+  closeForm();
+};
+$('resetBtn').onclick = async () => {
+  await api('POST', `/api/rooms/${editingId}/reset`).catch((e) => alert(e.message));
+  closeForm();
+};
+
+// ── サーバーからの更新 ──
+function upsertRoom(data) {
+  const cur = rooms.get(data.id);
+  if (cur) {
+    const { messages, ...rest } = data;
+    Object.assign(cur, rest);
+  } else rooms.set(data.id, { ...data, messages: data.messages || [] });
+}
+async function loadState() {
+  const s = await api('GET', '/api/state');
+  defaultCwd = s.defaultCwd;
+  rooms.clear();
+  for (const r of s.rooms) rooms.set(r.id, r);
+  if (activeId && !rooms.has(activeId)) activeId = null;
+  renderRooms();
+  renderChat();
+}
+function connect() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => { $('conn').classList.add('on'); loadState().catch(() => {}); };
+  es.onerror = () => $('conn').classList.remove('on');
+  es.addEventListener('room', (e) => {
+    upsertRoom(JSON.parse(e.data));
+    renderRooms();
+    renderHead();
+    const stick = nearBottom();
+    renderTyping();
+    if (stick) toBottom();
+  });
+  es.addEventListener('deleted', (e) => {
+    const { roomId } = JSON.parse(e.data);
+    rooms.delete(roomId);
+    if (activeId === roomId) { activeId = null; renderChat(); }
+    renderRooms();
+  });
+  es.addEventListener('message', (e) => {
+    const { roomId, message } = JSON.parse(e.data);
+    const room = rooms.get(roomId);
+    if (!room || room.messages.some((m) => m.id === message.id)) return;
+    const prev = room.messages[room.messages.length - 1];
+    room.messages.push(message);
+    room.updatedAt = message.ts;
+    if (roomId === activeId) {
+      const stick = nearBottom() || message.role === 'me';
+      document.getElementById('typingRow')?.remove();
+      appendMsg(room, message, prev);
+      renderTyping();
+      if (stick) toBottom();
+      markSeen();
+    }
+    renderRooms();
+  });
+  es.addEventListener('delta', (e) => {
+    const { roomId, id, text } = JSON.parse(e.data);
+    const m = rooms.get(roomId)?.messages.find((x) => x.id === id);
+    if (!m) return;
+    m.text += text;
+    const el = roomId === activeId && msgEls.get(id);
+    if (el) scheduleBody(el, m);
+  });
+  es.addEventListener('patch', (e) => {
+    const { roomId, id, patch } = JSON.parse(e.data);
+    const room = rooms.get(roomId);
+    const m = room?.messages.find((x) => x.id === id);
+    if (!m) return;
+    Object.assign(m, patch);
+    const el = roomId === activeId && msgEls.get(id);
+    if (el && el.classList.contains('row')) {
+      const stick = nearBottom();
+      setBody(el.querySelector('.bubble'), m);
+      el.querySelector('.meta').innerHTML = metaHtml(m);
+      if (stick) toBottom();
+    }
+    renderRooms();
+  });
+}
+// ストリーミング中の再描画は 1 フレームに 1 回へまとめる
+const pending = new Map();
+function scheduleBody(el, m) {
+  if (!pending.size) requestAnimationFrame(() => {
+    const stick = nearBottom();
+    for (const [e2, m2] of pending) setBody(e2.querySelector('.bubble'), m2);
+    pending.clear();
+    if (stick) toBottom();
+  });
+  pending.set(el, m);
+}
+
+connect();
+</script>
+</body>
+</html>
